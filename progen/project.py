@@ -201,8 +201,6 @@ class Project:
             else:
                 raise NameError ("'src' type project %s can't be root project." % (name))
         
-        print(self.src_dicts)
-        
         #Process required project
         self.sub_projects = {}
         for subproj in self.project['required']:                        
