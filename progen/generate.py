@@ -88,6 +88,7 @@ class Generator:
         """
         update properties when parser sub-project and required project
         """
+        if not prop_dict: return
         for key, value in prop_dict.items():
             if type(value) is dict:
                 if key in self.settings.properties:

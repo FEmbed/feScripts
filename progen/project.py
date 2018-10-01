@@ -15,14 +15,14 @@
 import os
 import shutil
 import logging
-import operator
 import copy
 import yaml
 # import json
 
 from .tools_supported import ToolsSupported
 from .tools.tool import get_tool_template
-from .util import merge_recursive, PartialFormatter, FILES_EXTENSIONS, VALID_EXTENSIONS, FILE_MAP, copytree, fix_paths, merge_without_override, fix_properties_in_context
+from .util import merge_recursive, PartialFormatter, FILES_EXTENSIONS, VALID_EXTENSIONS,\
+    FILE_MAP, copytree, fix_paths, merge_without_override, fix_properties_in_context
 
 logger = logging.getLogger('progen.project')
 
@@ -50,6 +50,9 @@ class ProjectTemplate:
             *** files ***
             'includes': {},
             'sources': {},
+            
+            *** subsrc *** 
+            'subsrc' : [] #store separate yaml for current module.
             
             *** compile options ***
             'common': {
@@ -166,56 +169,28 @@ class Project:
         
         try:
             with open(os.path.sep.join([self.basepath, "module.yaml"]), 'rt') as f:
-                self.src_dicts = yaml.load(f)
-                if 'tool_specific' in self.src_dicts:
-                    for tool in self.src_dicts['tool_specific']:
-                        if tool in tool_keywords:
-                            for key in self.src_dicts['tool_specific'][tool]:
-                                if key == 'properties':
-                                    gen.merge_properties_without_override(self.src_dicts['tool_specific'][tool]['properties'])
-                                elif key == 'files' :
-                                    # files need careful merge
-                                    for ikey in self.src_dicts['tool_specific'][tool][key]:
-                                        self._process_files_item(ikey, self.src_dicts['tool_specific'][tool])
-                                elif key in self.project:
-                                    self.project[key] = Project._dict_elim_none(
-                                        merge_recursive(self.project[key], self.src_dicts['tool_specific'][tool][key]))
-
-                if 'favors' in self.src_dicts:
-                    for key in self.src_dicts['favors']:
-                        if key not in self.favors:
-                            self.favors[key] = self.src_dicts['favors'][key]
-
-                if 'properties' in self.src_dicts:
-                    gen.merge_properties_without_override(self.src_dicts['properties'])
-                if 'favor_dimensions' in self.src_dicts:
-                    #process favor context
-                    for dim in self.src_dicts['favor_dimensions']:
-                        if dim not in self.favors:
-                            raise NameError ("%s in favor_dimensions not set for project %s." % (dim, name))
-                        else:
-                            favor = self.src_dicts['project_favors'][self.favors[dim]]
-                            if favor['dimension'] != dim :
-                                raise NameError ("project_favors %s's dimension:%s, is not %s." %
-                                                 (self.favors[dim], favor['dimension'], dim))
-                            for key in favor :
-                                if key == 'properties':
-                                    gen.merge_properties_without_override(favor['properties'])
-                                elif key == 'dimension':
-                                    pass
-                                elif key == 'files' :
-                                    # files need careful merge
-                                    for ikey in favor[key]:
-                                        self._process_files_item(ikey, favor)
-                                elif key in self.project:
-                                    self.project[key] = Project._dict_elim_none(merge_recursive(self.project[key], favor[key]))
+                self.src_dicts = self._open_yaml_file(f, name, tool_keywords, gen)
+            
+            self._update_from_src_dict(Project._dict_elim_none(self.src_dicts))
+            self.src_dicts['subsrc'] = fix_properties_in_context(self.src_dicts['subsrc'], settings.properties)
         except IOError:
-            raise IOError("The module.yaml in project:%s doesn't exist." % self.name)
+            raise IOError("The %s module.yaml in project:%s doesn't exist." % (os.path.sep.join([self.basepath, "module.yaml"]), self.name))
+        
+        try:
+            #Process subdir files used by yaml
+            for subsrc in self.src_dicts['subsrc']:
+                with open(os.path.sep.join([self.basepath, subsrc]), 'rt') as f:
+                    src_dicts = self._open_yaml_file(f, name, tool_keywords, gen)
+                    if src_dicts:
+                        self._update_from_src_dict(Project._dict_elim_none(src_dicts))
+                
+        except IOError:
+            raise IOError("The %s in project:%s doesn't exist." % (os.path.sep.join([self.basepath, subsrc]), self.name))
 
-        self._update_from_src_dict(Project._dict_elim_none(self.src_dicts))
+
         self.project['type'] = self.project['type'].lower()
         self.project = fix_properties_in_context(self.project, settings.properties)
-        
+                
         # always copy portable file to destionation
         self._copy_portable_to_destination()
         self.outdir_path = self._get_output_dir_path(self.tool)
@@ -225,6 +200,8 @@ class Project:
                 self.parent.update_from_required(self, self.project['type'])
             else:
                 raise NameError ("'src' type project %s can't be root project." % (name))
+        
+        print(self.src_dicts)
         
         #Process required project
         self.sub_projects = {}
@@ -241,6 +218,54 @@ class Project:
             self._inherit_parent_flags_and_macros(self.sub_projects[subproj])
                         
         self.generated_files = {}
+        
+    def _open_yaml_file(self, f, name, tool_keywords, gen):
+        src_dicts = yaml.load(f)
+        if 'tool_specific' in src_dicts:
+            for tool in src_dicts['tool_specific']:
+                if tool in tool_keywords:
+                    for key in src_dicts['tool_specific'][tool]:
+                        if key == 'properties':
+                            gen.merge_properties_without_override(src_dicts['tool_specific'][tool]['properties'])
+                        elif key == 'files' :
+                            # files need careful merge
+                            for ikey in src_dicts['tool_specific'][tool][key]:
+                                self._process_files_item(ikey, src_dicts['tool_specific'][tool])
+                        elif key in self.project:
+                            self.project[key] = Project._dict_elim_none(
+                                merge_recursive(self.project[key], src_dicts['tool_specific'][tool][key]))
+
+        if 'favors' in src_dicts:
+            for key in src_dicts['favors']:
+                if key not in self.favors:
+                    self.favors[key] = src_dicts['favors'][key]
+
+        if 'properties' in src_dicts:
+            # update proerties
+            gen.merge_properties_without_override(src_dicts['properties'])
+            
+        if 'favor_dimensions' in src_dicts:
+            #process favor context
+            for dim in src_dicts['favor_dimensions']:
+                if dim not in self.favors:
+                    raise NameError ("%s in favor_dimensions not set for project %s." % (dim, name))
+                else:
+                    favor = src_dicts['project_favors'][self.favors[dim]]
+                    if favor['dimension'] != dim :
+                        raise NameError ("project_favors %s's dimension:%s, is not %s." %
+                                         (self.favors[dim], favor['dimension'], dim))
+                    for key in favor :
+                        if key == 'properties':
+                            gen.merge_properties_without_override(favor['properties'])
+                        elif key == 'dimension':
+                            pass
+                        elif key == 'files' :
+                            # files need careful merge
+                            for ikey in favor[key]:
+                                self._process_files_item(ikey, favor)
+                        elif key in self.project:
+                            self.project[key] = Project._dict_elim_none(merge_recursive(self.project[key], favor[key]))
+        return src_dicts
     
     def _inherit_parent_flags_and_macros(self, subproj):
         for key in ['common', 'asm', 'c', 'cxx']:

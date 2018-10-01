@@ -22,11 +22,11 @@ import pkg_resources
 from .commands import build, clean, generate, init, list_projects
 
 subcommands = {
-    'init': init,
+#    'init': init,
     'generate': generate,
-    'clean': clean,
-    'list': list_projects,
-    'build': build,
+#    'clean': clean,
+#    'list': list_projects,
+#    'build': build,
 }
 
 def main():
