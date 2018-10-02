@@ -26,6 +26,13 @@ class Generator:
         try:
             with open(source, 'rt') as f:
                 self.projects_dict = yaml.load(f)
+                if 'toolchains' in self.projects_dict and \
+                    'gcc' in  self.projects_dict['toolchains'] and \
+                    'gcc_prefix' not in self.projects_dict['toolchains']:
+                    for name in  os.listdir(self.projects_dict['toolchains']['gcc']):
+                        if "-gcc" in name:
+                            self.projects_dict['toolchains']["gcc_prefix"] = name.split("-gcc")[0] + "-"
+                            break
                 if 'properties' in self.projects_dict:
                     self.properties = [self.projects_dict['properties']]                    
                     self.projects_dict = fix_properties_in_context(self.projects_dict, self.properties)
@@ -40,7 +47,7 @@ class Generator:
     
     def _generate_subproj(self, project):
         """ don't generate src project """
-        for k, sproj in project.sub_projects.items():
+        for sproj in project.sub_projects.values():
             if sproj.project['type'].lower() != "src":
                 yield sproj
                 self._generate_subproj(sproj)
@@ -77,6 +84,10 @@ class Generator:
             logging.error("You specified an invalid project name.")
 
     def push_properties(self):
+        """
+        parent project can't inherit sub project properties, so push it
+        when process sub project
+        """
         self.properties.append(copy.deepcopy(self.settings.properties))
         self.settings.properties = self.properties[-1]
         

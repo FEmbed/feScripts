@@ -16,7 +16,7 @@ import copy
 from os import getcwd
 
 from .tool import Tool, Exporter
-from .gccarm import MakefileGccArm
+from .gcc import MakefileGcc
 from ..util import SOURCE_KEYS
 
 class CMakeGccArm(Tool,Exporter):
@@ -30,7 +30,7 @@ class CMakeGccArm(Tool,Exporter):
 
     def __init__(self, workspace, env_settings):
         self.workspace = workspace
-        self.exporter = MakefileGccArm(workspace, env_settings)
+        self.exporter = MakefileGcc(workspace, env_settings)
         self.env_settings = env_settings
 
     @staticmethod

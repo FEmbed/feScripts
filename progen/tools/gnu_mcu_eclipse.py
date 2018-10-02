@@ -19,10 +19,20 @@ import logging
 from os.path import normpath, join, basename, exists
 
 from .tool import Tool, Builder, Exporter
-from .gccarm import MakefileGccArm
+from .gcc import MakefileGcc
 
 logger = logging.getLogger('progen.tools.gnu_mcu_eclipse')
 
+def _fix_special_symbol(line):
+    _line = line
+    if ">" in _line:
+        _line = _line.replace(">", "&gt;")
+    if "<" in _line:
+        _line = _line.replace("<", "&lt;")
+    if '"' in _line:
+        _line = _line.replace('"', "&quot;")
+    return _line
+    
 class EclipseGnuMCU(Tool, Exporter, Builder):
 
     file_types = {'cpp': 1, 'c': 1, 's': 1, 'obj': 1, 'lib': 1, 'h': 1}
@@ -246,7 +256,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
             
     def __init__(self, workspace, env_settings):
         self.definitions = 0
-        self.exporter = MakefileGccArm(workspace, env_settings)
+        self.exporter = MakefileGcc(workspace, env_settings)
         self.workspace = workspace
         self.env_settings = env_settings
             # all bool gnu mcu eclipse options store here
@@ -327,7 +337,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
 
     @staticmethod
     def get_toolchain():
-        return 'gcc_arm'
+        return 'gcc'
 
     def _expand_one_file(self, source, new_data, extension):
         # use reference count to instead '..'
@@ -362,6 +372,9 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
 
         output = copy.deepcopy(self.generated_project)
         expanded_dic = self.workspace.copy()
+        expanded_dic["toolchains"] = copy.copy(self.workspace["toolchains"])
+        expanded_dic["misc"] = self._fix_cmd_path(copy.copy(self.workspace["misc"]))
+        expanded_dic["macros"] = self._fix_macro_quot(expanded_dic["macros"])
         
         # process path format in windows
         for name in ['include_paths', 'source_paths','include_paths', 'linker_search_paths', 'lib_search_paths',
@@ -390,6 +403,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         expanded_dic["options"]["fpuabi"] = EclipseGnuMCU.get_fpuabi_gnuarmeclipse_id("")
         expanded_dic["options"]["fpu"] = EclipseGnuMCU.get_mfpu_gnuarmeclipse_id("")
         expanded_dic["options"]["unalignedaccess"] = EclipseGnuMCU.get_unalignedaccess_gnuarmeclipse_id("")
+
         
         c_flags = []
         cxx_flags = []
@@ -459,6 +473,24 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
                 npaths.append(path)
         return npaths
     
+    def _fix_cmd_path(self, misc):
+        _misc = copy.copy(misc)
+        for cmd in ["pre_cmd", "post_cmd"]:
+            if cmd in misc:
+                _misc[cmd] = []
+                for line in misc[cmd]:                    
+                    _misc[cmd].append(_fix_special_symbol(line))
+            _misc[cmd] = ";".join(_misc[cmd])
+        return _misc
+    
+    def _fix_macro_quot(self, macros):
+        _macros = {}
+        for key,values in macros.items():
+            _macros[key] = []
+            for macro in values:
+                _macros[key].append(_fix_special_symbol(macro))
+        return _macros
+
     def get_generated_project_files(self):
         return {'path': self.workspace['path'], 'files': [self.workspace['files']['proj_file'], self.workspace['files']['cproj'],
             self.workspace['files']['makefile']]}

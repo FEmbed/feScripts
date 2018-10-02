@@ -20,7 +20,7 @@ import xmltodict
 from collections import OrderedDict
 
 from .tool import Tool, Exporter
-from .gccarm import MakefileGccArm
+from .gcc import MakefileGcc
 from ..util import SOURCE_KEYS
 
 logger = logging.getLogger('progen.tools.visual_studio')
@@ -150,15 +150,15 @@ class VisualStudioMakeGCCARM(VisualStudioGDB):
 
     def __init__(self, workspace, env_settings):
         super(VisualStudioMakeGCCARM, self).__init__(workspace, env_settings)
-        self.exporter = MakefileGccArm(workspace, env_settings)
+        self.exporter = MakefileGcc(workspace, env_settings)
 
     @staticmethod
     def get_toolnames():
-        return VisualStudioGDB.get_toolnames() + MakefileGccArm.get_toolnames()
+        return VisualStudioGDB.get_toolnames() + MakefileGcc.get_toolnames()
 
     @staticmethod
     def get_toolchain():
-        return MakefileGccArm.get_toolchain()
+        return MakefileGcc.get_toolchain()
 
     def export_project(self):
         output = copy.deepcopy(self.generated_project)

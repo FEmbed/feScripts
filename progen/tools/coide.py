@@ -70,7 +70,7 @@ class Coide(Tool, Exporter, Builder):
 
     @staticmethod
     def get_toolchain():
-        return 'gcc_arm'
+        return 'gcc'
 
     def _expand_one_file(self, source, new_data, extension):
         return {'@path': source, '@name': basename(source), '@type': str(self.file_types[extension.lower()])}

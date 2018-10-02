@@ -20,7 +20,7 @@ from collections import OrderedDict
 from os.path import normpath, join, basename
 
 from .tool import Tool, Builder, Exporter
-from .gccarm import MakefileGccArm
+from .gcc import MakefileGcc
 from ..util import SOURCE_KEYS
 
 logger = logging.getLogger('progen.tools.eclipse_make_gcc_arm')
@@ -40,7 +40,7 @@ class EclipseMakeGccARM(Tool, Exporter, Builder):
 
     def __init__(self, workspace, env_settings):
         self.definitions = 0
-        self.exporter = MakefileGccArm(workspace, env_settings)
+        self.exporter = MakefileGcc(workspace, env_settings)
         self.workspace = workspace
         self.env_settings = env_settings
 
@@ -50,7 +50,7 @@ class EclipseMakeGccARM(Tool, Exporter, Builder):
 
     @staticmethod
     def get_toolchain():
-        return 'gcc_arm'
+        return 'gcc'
 
     def _expand_one_file(self, source, new_data, extension):
         # use reference count to instead '..'

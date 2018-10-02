@@ -86,7 +86,7 @@ def get_tool_template():
             "ld" : []
             },
         "template": None,
-        "misc": {}        
+        "misc": {}
     }
     return internal_template
 

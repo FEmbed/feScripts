@@ -34,6 +34,7 @@ class ProjectTemplate:
             'type': type,               # project type
             'templates': [],            # templates
             'required': {},             # required project/lib/src
+            'misc': {},
             
             *** dimensisons/favors ***
             'favor_dimensions' : [xx, yy]
@@ -125,7 +126,8 @@ class ProjectTemplate:
             'export_dir': '',         # Export directory path
             'name': name,             # project name
             'type': output_type,      # output type, default - exe
-            'templates': [],          # templates            
+            'templates': [],          # templates
+            'misc': {},
             'linker_search_paths': [],
             'lib_search_paths': [],
             'required': {},           # Tools which are supported,
@@ -150,8 +152,7 @@ class Project:
             project_dicts = {}
         assert type(project_dicts) is dict, "Project %s records/dics must be a dict" % (name, project_dicts) 
 
-        tool_keywords = self._get_tool_keywords(tool)
-        
+        tool_keywords = self._get_tool_keywords(tool)        
         self.settings = settings
         self.name = name
         self.tool = tool
@@ -166,6 +167,7 @@ class Project:
             gen.merge_properties_without_override(project_dicts['properties'])
             
         self.project = ProjectTemplate.get_project_template(self.name)
+        self._update_toolchains(tool_keywords, gen)
         
         try:
             with open(os.path.sep.join([self.basepath, "module.yaml"]), 'rt') as f:
@@ -216,6 +218,14 @@ class Project:
             self._inherit_parent_flags_and_macros(self.sub_projects[subproj])
                         
         self.generated_files = {}
+        
+    def _update_toolchains(self, tool_keywords, gen):
+        if "gcc" in tool_keywords and "gcc" in gen.projects_dict['toolchains']:
+            self.project.setdefault("toolchains", {})['gcc'] = gen.projects_dict['toolchains']["gcc"]
+            self.project['toolchains']['gcc_prefix'] = gen.projects_dict['toolchains']["gcc_prefix"]
+        else:
+            self.project['toolchains'] = {}
+            self.project['toolchains']['gcc_prefix'] = "arm-none-eabi-"
         
     def _open_yaml_file(self, f, name, tool_keywords, gen):
         src_dicts = yaml.load(f)
@@ -545,19 +555,22 @@ class Project:
                 self.export['linker_file'] = os.path.join(self.name,self.project['linker']['script_files'][0])
         except IndexError:
             raise NameError ("linker file must be set.")
-                        
+        
+        self.export["toolchains"] = self.project["toolchains"]
+        self.export["misc"] = self.project["misc"]
+        
         # re-order include paths
         include_paths = []
         for path in self.export['include_paths']:
             portable = False
-            for dir in self.portable_dirs:
-                if dir in path:
+            for _dir in self.portable_dirs:
+                if _dir in path:
                     portable = True
             if portable:
                 include_paths.insert(0, path)
             else:
                 include_paths.append(path)                
-        self.export['include_paths'] = include_paths
+        self.export['include_paths'] = include_paths            
         
         fix_paths(self.export, self.export['output_dir']['rel_path'],
                    list(FILES_EXTENSIONS.keys()) + ['include_paths', 'source_paths', 'linker_search_paths'])
@@ -690,14 +703,7 @@ class Project:
         
         # dump a log file if debug is enabled
         if logger.isEnabledFor(logging.DEBUG):
-            dump_data = {}
-            dump_data['files'] = self.project['files']
-            dump_data['tool_specific'] = self.project['tool_specific']
-            dump_data['merged'] = self.export
-            handler = logging.FileHandler(os.path.join(os.getcwd(), "%s.log" % self.name),"w", encoding=None, delay="true")
-            handler.setLevel(logging.DEBUG)
-            logger.addHandler(handler)
-            logger.debug("\n" + yaml.dump(dump_data))
+            pass
 
         files = exporter(self.export, self.settings).export_project()
         generated_files[self.tool] = files

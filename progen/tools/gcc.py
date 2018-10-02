@@ -19,18 +19,18 @@ from .makefile import MakefileTool
 
 logger = logging.getLogger('progen.tools.gccarm')
 
-class MakefileGccArm(MakefileTool):
+class MakefileGcc(MakefileTool):
 
     def __init__(self, workspace, env_settings):
         MakefileTool.__init__(self, workspace, env_settings, logging)
 
     @staticmethod
     def get_toolnames():
-        return ['gcc_arm']
+        return ['gcc']
 
     @staticmethod
     def get_toolchain():
-        return 'gcc_arm'
+        return 'gcc'
 
     def export_project(self):
         """ Processes misc options specific for GCC ARM, and run generator """

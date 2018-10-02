@@ -13,9 +13,9 @@
 # limitations under the License.
 import copy
 
-from .gccarm import MakefileGccArm
+from .gcc import MakefileGcc
 
-class SublimeTextMakeGccARM(MakefileGccArm):
+class SublimeTextMakeGccARM(MakefileGcc):
 
     generated_project = {
         'path': '',
@@ -34,7 +34,7 @@ class SublimeTextMakeGccARM(MakefileGccArm):
 
     @staticmethod
     def get_toolchain():
-        return 'gcc_arm'
+        return 'gcc'
 
     def _fix_sublime_paths(self, data):
         fixed_paths = []
