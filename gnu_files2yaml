@@ -1,4 +1,6 @@
-e this scripts to generate uboot and linux editor project
+#!/usr/bin/env python
+'''
+we use this scripts to generate uboot and linux editor project
 @author: Gene Kong
 '''
 
