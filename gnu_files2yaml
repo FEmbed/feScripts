@@ -1,0 +1,85 @@
+e this scripts to generate uboot and linux editor project
+@author: Gene Kong
+'''
+
+import os.path
+from collections import OrderedDict
+class data(object):
+    def __init__(self):
+        self.include_path = OrderedDict()
+        self.include_file = OrderedDict()
+        self.macros = OrderedDict()
+        self.files_with_group = OrderedDict()
+    
+def print_info(pd):
+    print pd.include_file.keys()
+    
+    print("bool=int")
+    print("true=1")
+    print("false=0")
+    print("__GNUC__")
+
+    for key in pd.macros.keys():
+        if key.startswith("KBUILD_BASENAME") :
+            continue
+        elif key.startswith("KBUILD_MODNAME") :
+            continue
+        print key
+    
+    indent = 0
+    print "%sfiles:" % (' ' * indent)
+    
+    indent += 4    
+    print "%sincludes:" % (' ' * indent)
+    indent += 4 
+    for f in pd.include_path.keys():
+        if f.strip("./"):
+            print "%s- %s" %(' ' * indent, f.strip("./"))
+    indent -= 4 
+    indent -= 4 
+    
+    indent += 4    
+    print "%ssources:" % (' ' * indent)
+    
+    indent += 4
+    for key in pd.files_with_group.keys():
+        print "%s%s:" % (' ' * indent, key)
+        indent += 2
+        for f in pd.files_with_group[key]:
+            print "%s- %s" %(' ' * indent, f)
+        indent -= 2
+        
+if __name__ == '__main__':
+    
+    main = data()
+    spl = data()
+    
+    #with open(r"Z:\01-Personal_Home\Gene.Kong\share_works\lichee\u-boot\fileinfo.lst") as f:
+    with open(r"Z:\01-Personal_Home\Gene.Kong\share_works\lichee\linux\fileinfo.lst") as f:
+        for line in f:
+            items = line.split()
+            if items[-1].endswith(".c") or items[-1].endswith(".S"):
+                if "DO_DEPS_ONLY" in line:
+                    continue
+                elif "MODULE" in line:
+                    # don't process module
+                    continue
+                if "CONFIG_SPL_BUILD" in line:
+                    pd = spl
+                else:
+                    pd = main
+                    
+                pd.files_with_group.setdefault("/".join(items[-1].split('/')[:-1]), []).append(items[-1])
+                
+                m = len(items)
+                for i in range(m - 1):
+                    if items[i].startswith("-I"):
+                        pd.include_path.setdefault(items[i][2:], []).append(items[-1])
+                    elif items[i] == "-include":
+                        pd.include_file.setdefault(items[i+1], []).append(items[-1])
+                    elif items[i].startswith("-D"):
+                        pd.macros.setdefault(items[i][2:], []).append(items[-1])
+                
+    print_info(spl)
+    print("====================================================================")
+    print_info(main)
