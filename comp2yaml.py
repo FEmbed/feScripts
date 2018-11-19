@@ -18,15 +18,14 @@
 import sys
 
 # 0 -> scripts name
-# 1 -> compile type
-# 2 .. -> compile options
-
-project_name = sys.argv[1]
+# 1 .. -> compile options
 
 """
 files_db.files :
     {
         "path": "/mnt/k/fastembedded/FASTEMBEDDED_RTOS_SDK/components/feHAL/ST/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_nor.c",
+        "opath" : "",
+        "component" : "",
         "macros" : ["xx", "yy=1"],
         "include" : ["include=xx.h"],
         "incdir" : ["/abc", "ecd/a/"],
@@ -34,6 +33,7 @@ files_db.files :
     }
 files_db.linker :
     {
+        "opath" : "",
         "options" : [],
     }
 """
@@ -44,9 +44,10 @@ OPTS_OPATH = "-o"
 
 options_with_arg = [OPTS_MACRO, OPTS_INCLUDE, OPTS_INCDIR, OPTS_OPATH, "-T", "-L", "-u", "-Xlinker"]
 
-def parse_compile_options(options, path) :
+def parse_compile_options(options, path, name) :
     files_obj = {
         "path": path,
+        "component": name,
         "opath" : "",
         "macros": [],
         "include": [],
@@ -106,10 +107,10 @@ def parse_linker_options(options) :
         i += 1
     return linker_obj
 
-# Tables ASM
-if sys.argv[-1].endswith(".map") :    
-    linker_obj = parse_linker_options(sys.argv[2:-1])
-    print(linker_obj)
-else:
-    files_obj = parse_compile_options(sys.argv[2:-1], sys.argv[-1])
-    print([files_obj])
+with open(sys.argv[1], "r") as f:
+    for line in f:
+        items = line.split()
+        if items[-1].endswith(".map") :    
+            linker_obj = parse_linker_options(items[:-1])
+        else:
+            files_obj = parse_compile_options(items[1:-1], items[-1], items[0])
