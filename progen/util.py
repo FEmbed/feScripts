@@ -19,6 +19,7 @@ import string
 import operator
 import copy
 import re
+from collections import OrderedDict
 
 from functools import reduce
 
@@ -45,10 +46,14 @@ def uniqify(_list):
     return reduce(lambda r, v: v in r[1] and r or (r[0].append(v) or r[1].add(v)) or r, _list, ([], set()))[0]
 
 def merge_recursive(*args):
-    if all(isinstance(x, dict) for x in args):
-        output = {}
-        keys = reduce(operator.or_, [set(x) for x in args])
-
+    if all(isinstance(x, dict) for x in args) or all(isinstance(x, OrderedDict) for x in args):
+        output = {} if type(args[0]) is dict else OrderedDict()
+        keys = []
+        for x in args:
+            for y in x.keys():
+                if y not in keys:
+                    keys.append(y)
+                        
         for key in keys:
             # merge all of the ones that have them
             output[key] = merge_recursive(*[x[key] for x in args if key in x])
@@ -64,6 +69,9 @@ def merge_recursive(*args):
         elif type(args[0]) is dict and type(args[1]) is list:
             _args = [args[0], {"": args[1]}]
             return merge_recursive(*_args)
+        elif type(args[0]) is OrderedDict and type(args[1]) is list:
+            _args = [args[0], OrderedDict({"": args[1]})]
+            return merge_recursive(*_args)
         else:
             return reduce(operator.add, args)
     
@@ -72,7 +80,7 @@ def merge_without_override(dest, src):
     process list as a single object.
     """
     for key, value in src.items():
-        if type(value) is dict:
+        if type(value) is dict or type(value) is OrderedDict:
             if key in dest:
                 merge_without_override(dest[key], value)
             else:
@@ -88,7 +96,7 @@ def merge_with_override(dest, src):
     process list as a single object.
     """
     for key, value in src.items():
-        if type(value) is dict:
+        if type(value) is dict or type(value) is OrderedDict:
             if key in dest:
                 merge_with_override(dest[key], value)
             else:
@@ -150,7 +158,7 @@ def fix_paths(project_data, rel_path, extensions):
     norm_func = lambda path : os.path.normpath(os.path.join(rel_path, path))
     for key in extensions:
         if key in project_data:
-            if type(project_data[key]) is dict:
+            if type(project_data[key]) is dict or type(project_data[key]) is OrderedDict:
                 for k,v in project_data[key].items():
                     project_data[key][k] = [norm_func(i) for i in v]
             elif type(project_data[key]) is list:

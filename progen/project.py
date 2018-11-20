@@ -17,6 +17,7 @@ import shutil
 import logging
 import copy
 import yaml
+from collections import OrderedDict
 # import json
 
 from .tools_supported import ToolsSupported
@@ -105,7 +106,7 @@ class ProjectTemplate:
                 'libraries': []
             },
             'files': {
-                'includes': {},
+                'includes': OrderedDict(),
                 'sources': {}
             },
         }
@@ -175,24 +176,24 @@ class Project:
                     self.src_dicts = self._open_yaml_file(f, name, tool_keywords, gen)
                 
                 self._update_from_src_dict(Project._dict_elim_none(self.src_dicts))
-                self.src_dicts['subsrc'] = fix_properties_in_context(self.src_dicts['subsrc'], settings.properties)
+                if('subsrc' in self.src_dicts):
+                    self.src_dicts['subsrc'] = fix_properties_in_context(self.src_dicts['subsrc'], settings.properties)
             except IOError:
                 raise IOError("The %s module.yaml in project:%s doesn't exist." % (os.path.sep.join([self.basepath, "module.yaml"]), self.name))
         else:
             self.src_dicts = ctx
             self._update_from_src_dict(Project._dict_elim_none(self.src_dicts))
-            
-        try:
-            #Process subdir files used by yaml
-            for subsrc in self.src_dicts['subsrc']:
-                with open(os.path.sep.join([self.basepath, subsrc]), 'rt') as f:
-                    src_dicts = self._open_yaml_file(f, name, tool_keywords, gen)
-                    if src_dicts:
-                        self._update_from_src_dict(Project._dict_elim_none(src_dicts))
-                
-        except IOError:
-            raise IOError("The %s in project:%s doesn't exist." % (os.path.sep.join([self.basepath, subsrc]), self.name))
 
+        if('subsrc' in self.src_dicts):
+            try:
+                #Process subdir files used by yaml
+                for subsrc in self.src_dicts['subsrc']:
+                    with open(os.path.sep.join([self.basepath, subsrc]), 'rt') as f:
+                        src_dicts = self._open_yaml_file(f, name, tool_keywords, gen)
+                        if src_dicts:
+                            self._update_from_src_dict(Project._dict_elim_none(src_dicts))                
+            except IOError:
+                raise IOError("The %s in project:%s doesn't exist." % (os.path.sep.join([self.basepath, subsrc]), self.name))
 
         self.project['type'] = self.project['type'].lower()
         self.project = fix_properties_in_context(self.project, settings.properties)
@@ -276,7 +277,7 @@ class Project:
                             for ikey in favor[key]:
                                 self._process_files_item(ikey, favor)
                         elif key in self.project:
-                            self.project[key] = Project._dict_elim_none(merge_recursive(self.project[key], favor[key]))
+                            self.project[key] = Project._dict_elim_none(merge_recursive(self.project[key], favor[key]))                            
         return src_dicts
     
     def _inherit_parent_flags_and_macros(self, subproj):
@@ -342,7 +343,7 @@ class Project:
             
         #Merge file path
         if "files" in src_project:
-            src_project["files"]["includes"] = {}
+            src_project["files"]["includes"] = OrderedDict()
             for key, value in subproj.project["files"]["includes"].items():
                 src_project["files"]["includes"][key] = []
                 for path in value:
@@ -367,7 +368,7 @@ class Project:
     def _process_files_item(self, key, src_dicts):
         if type(src_dicts['files'][key]) is list:
             self.project['files'][key].setdefault('default',[]).extend(src_dicts['files'][key])
-        else:
+        else:            
             self.project['files'][key] = Project._dict_elim_none(
                 merge_recursive(
                     self.project['files'][key],
@@ -410,7 +411,7 @@ class Project:
     def _process_include_files(self, files, use_group_name = 'default', add_basepath = True):
         # If it's dic add it , if file, add it to files
         use_includes = []
-        if type(files) == dict:
+        if type(files) in [dict,  OrderedDict]:
             for group_name, include_files in files.items():
                 self._process_include_files(include_files, group_name)
         elif type(files) == list:
@@ -542,7 +543,7 @@ class Project:
                 self.export["linker_search_paths"].append(path)
             else:
                 self.export["linker_search_paths"].append(os.path.join(self.name, path))
-                
+
         self.export['linker'] = self.project['linker']
         self.export['output_type'] = self.project['type']
         self.export['name'] = self.name

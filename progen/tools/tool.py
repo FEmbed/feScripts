@@ -60,7 +60,7 @@ def get_tool_template():
         'include_paths': [],
         'linker_search_paths':[],
         'lib_search_paths': [],
-        'include_files': {},
+        'include_files': OrderedDict(),
         'source_files_c': {},
         'source_files_cpp': {},
         'source_files_s': {},

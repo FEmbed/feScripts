@@ -19,6 +19,7 @@ import sys
 import os
 import os.path
 import argparse
+from collections import OrderedDict
 
 from progen.tools_supported import ToolsSupported
 from progen.commands import argparse_filestring_type, argparse_string_type
@@ -66,8 +67,8 @@ OPTS_LINK_FILE = "-T"
 OPTS_LINK_LIBDIR = "-L"
 OPTS_LINK_LIB = "-l"
 
-options_with_arg = [OPTS_MACRO, OPTS_INCLUDE, OPTS_INCDIR, OPTS_OPATH, "-T", "-L", "-u", "-Xlinker", OPTS_LINK_FILE, OPTS_LINK_LIB, OPTS_LINK_LIBDIR]
-options_exclude = ["-c"]
+options_with_arg = [OPTS_MACRO, OPTS_INCLUDE, OPTS_INCDIR, OPTS_OPATH, "-u", "-Xlinker", OPTS_LINK_FILE, OPTS_LINK_LIB, OPTS_LINK_LIBDIR]
+options_exclude = ["-c", "-Wl,--start-group", "-Wl,--end-group"]
 
 c_source_file_ext = [".c" ]
 cpp_source_file_ext = [".cc", ".cpp"]
@@ -94,8 +95,10 @@ def parse_compile_options(options, path, name) :
         elif options[i].startswith(OPTS_INCLUDE) :
             if len(options[i]) == len(OPTS_INCLUDE):
                 files_obj["include"].append(options[i + 1])
+                files_obj["options"].append(options[i] + " " + options[i + 1])
             else:
                 files_obj["include"].append(options[i][len(OPTS_INCLUDE):])
+                files_obj["options"].append(options[i])                
         elif options[i].startswith(OPTS_INCDIR) :
             if len(options[i]) == len(OPTS_INCDIR):
                 files_obj["incdir"].append(options[i + 1])
@@ -125,7 +128,7 @@ def parse_linker_options(options) :
     i = 0
     while i < len(options):
         # process
-        if not options[i].endswith(".o") :            
+        if not options[i].endswith(".o") :
             if options[i].startswith(OPTS_OPATH) :
                 if len(options[i]) == len(OPTS_OPATH):
                     linker_obj["opath"] = options[i + 1]
@@ -146,13 +149,18 @@ def parse_linker_options(options) :
                 if len(options[i]) == len(OPTS_LINK_LIB):
                     linker_obj["lib"].append(options[i + 1])
                 else:
-                    linker_obj["lib"].append(options[i][len(OPTS_LINK_LIB):])
+                    linker_obj["lib"].append(options[i][len(OPTS_LINK_LIB):])            
+            elif options[i] in options_exclude:
+                pass
             else:
                 if options[i] in options_with_arg:
                     linker_obj["options"].append(options[i] + " " + options[i + 1])
                 else:
                     linker_obj["options"].append(options[i])
-        i += 1
+        if options[i] in options_with_arg:
+            i += 2
+        else:
+            i += 1
     return linker_obj
 
 class DataObj(object):
@@ -162,7 +170,7 @@ class DataObj(object):
         self.cpp = { "flags": set([]), "macros": set([]) }
         self.asm = { "flags": set([]), "macros": set([]) }
         self.linker = { "flags": set([]), "search_paths": set([]), "script_files": set([]) }
-        self.includes = {}
+        self.includes = OrderedDict()
         self.sources = {}
 
     def feedFileOptions(self, obj):
@@ -177,7 +185,7 @@ class DataObj(object):
             self.asm["flags"] = self.asm["flags"] | set(obj["options"])
             self.asm["macros"] = self.asm["macros"] | set(obj["macros"])
 
-        self.comm["flags"] = self.comm["flags"] | set(obj["include"])
+        self.comm["flags"] = self.comm["flags"]
 
         for include in obj["incdir"]:
             if include.startswith(FE_SDK_PATH):
@@ -187,8 +195,8 @@ class DataObj(object):
             else :
                 print("Error found relative include path in %s.", str(obj))
                 exit(2)
-            self.includes[group_name] = os.path.relpath(include, APP_WORK_DIR+ "/build")
-        
+            self.includes[group_name] = os.path.relpath(include, APP_WORK_DIR+ "/dummy")
+
         group_name = os.path.dirname(obj["path"])
         if group_name.startswith(FE_SDK_PATH):
             group_name = group_name[len(FE_SDK_PATH) + 1:]
@@ -199,7 +207,7 @@ class DataObj(object):
             print("Error found relative sources path in %s.", str(obj))
             exit(3)
 
-        self.sources.setdefault(group_name, []).append(os.path.relpath(obj["path"], APP_WORK_DIR + "/build"))
+        self.sources.setdefault(group_name, []).append(os.path.relpath(obj["path"], APP_WORK_DIR + "/dummy"))
 
     def feedLinkerOptions(self, obj):
         self.linker["flags"] = set(obj["options"])
@@ -250,8 +258,6 @@ class DataObj(object):
 
         project_dicts["subsrc"] = {}
         project_dicts["files"] = {"includes": self.includes, "sources": self.sources}
-
-
         return project_dicts
 
 class Generator:
@@ -300,10 +306,3 @@ if __name__ == '__main__':
 
     generate = Generator(data_obj)
     generate.generate(args.project, args.tool)
-
-    #print(yaml_obj.comm)
-    #print(yaml_obj.asm)
-    #print(yaml_obj.c)
-    #print(yaml_obj.cpp)
-    #print(yaml_obj.includes)
-    #print(yaml_obj.sources)

@@ -343,7 +343,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         # use reference count to instead '..'
         source = normpath(source).replace('\\', '/')
         # new_data['output_dir']['rel_count']
-        return {"path": join('PARENT-%d-PROJECT_LOC' % source.count("../"), source).replace('../', ''),
+        return {"path": join('PARENT-%d-PROJECT_LOC' % source.count("../"), source).replace('../', '').replace('\\', '/'),
                 "name": basename(source), 
                 "type": self.file_types[extension.lower()]}
 
@@ -404,7 +404,6 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         expanded_dic["options"]["fpuabi"] = EclipseGnuMCU.get_fpuabi_gnuarmeclipse_id("")
         expanded_dic["options"]["fpu"] = EclipseGnuMCU.get_mfpu_gnuarmeclipse_id("")
         expanded_dic["options"]["unalignedaccess"] = EclipseGnuMCU.get_unalignedaccess_gnuarmeclipse_id("")
-
         
         c_flags = []
         cxx_flags = []

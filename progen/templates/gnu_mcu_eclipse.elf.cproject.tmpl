@@ -181,7 +181,7 @@
                                 <option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.usenewlibnano.911052448" name="Use newlib-nano (--specs=nano.specs)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.usenewlibnano" useByScannerDiscovery="false" value="{{options.value['--specs=nano.specs']}}" valueType="boolean"/>
                                 <option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.libs.954629002" name="Libraries (-l)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.libs" useByScannerDiscovery="false" valueType="libs">
                                     {%- for file in linker.libraries %} 
-                                    <listOptionValue builtIn="false" value="{{file}};"/> 
+                                    <listOptionValue builtIn="false" value="{{file}}"/> 
                                     {% endfor -%}
                                 </option>
                                 <option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.nodeflibs.2052339145" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.nodeflibs" value="{{options.value['-nodefaultlibs']}}" valueType="boolean"/>
