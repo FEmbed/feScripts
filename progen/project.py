@@ -145,7 +145,7 @@ class Project:
 
     """ Represents a project, which can be formed of many yaml files """
 
-    def __init__(self, name, tool, project_dicts, settings, gen, parent = None):
+    def __init__(self, name, tool, project_dicts, settings, gen, parent = None, ctx = None):
         """ Initialise a project with a yaml file """
 
         if not project_dicts:
@@ -169,15 +169,19 @@ class Project:
         self.project = ProjectTemplate.get_project_template(self.name)
         self._update_toolchains(tool_keywords, gen)
         
-        try:
-            with open(os.path.sep.join([self.basepath, "module.yaml"]), 'rt') as f:
-                self.src_dicts = self._open_yaml_file(f, name, tool_keywords, gen)
-            
+        if type(ctx) is not dict:
+            try:
+                with open(os.path.sep.join([self.basepath, "module.yaml"]), 'rt') as f:
+                    self.src_dicts = self._open_yaml_file(f, name, tool_keywords, gen)
+                
+                self._update_from_src_dict(Project._dict_elim_none(self.src_dicts))
+                self.src_dicts['subsrc'] = fix_properties_in_context(self.src_dicts['subsrc'], settings.properties)
+            except IOError:
+                raise IOError("The %s module.yaml in project:%s doesn't exist." % (os.path.sep.join([self.basepath, "module.yaml"]), self.name))
+        else:
+            self.src_dicts = ctx
             self._update_from_src_dict(Project._dict_elim_none(self.src_dicts))
-            self.src_dicts['subsrc'] = fix_properties_in_context(self.src_dicts['subsrc'], settings.properties)
-        except IOError:
-            raise IOError("The %s module.yaml in project:%s doesn't exist." % (os.path.sep.join([self.basepath, "module.yaml"]), self.name))
-        
+            
         try:
             #Process subdir files used by yaml
             for subsrc in self.src_dicts['subsrc']:

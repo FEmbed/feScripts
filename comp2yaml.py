@@ -16,9 +16,30 @@
 # This file is use for collect compile information
 
 import sys
+import os
+import os.path
+import argparse
+
+from progen.tools_supported import ToolsSupported
+from progen.commands import argparse_filestring_type, argparse_string_type
+from progen.project import Project
+from progen.settings import ProjectSettings
+
+FE_SDK_PATH = os.environ.get("FE_SDK_PATH")
+CROSS_COMPILE = os.environ.get("CROSS_COMPILE")
+
+if not FE_SDK_PATH:
+    print("Please set environment variable: FE_SDK_PATH")
+    exit(1)
+if not CROSS_COMPILE:
+    print("Please set environment variable: CROSS_COMPILE")
+    exit(1)
+
+app_gen_path = os.path.abspath(sys.argv[1])
+APP_WORK_DIR = app_gen_path[:app_gen_path.rindex("build") -1]
 
 # 0 -> scripts name
-# 1 .. -> compile options
+# 1 .. -> input file
 
 """
 files_db.files :
@@ -41,8 +62,16 @@ OPTS_MACRO = "-D"
 OPTS_INCLUDE = "-include"
 OPTS_INCDIR = "-I"
 OPTS_OPATH = "-o"
+OPTS_LINK_FILE = "-T"
+OPTS_LINK_LIBDIR = "-L"
+OPTS_LINK_LIB = "-l"
 
-options_with_arg = [OPTS_MACRO, OPTS_INCLUDE, OPTS_INCDIR, OPTS_OPATH, "-T", "-L", "-u", "-Xlinker"]
+options_with_arg = [OPTS_MACRO, OPTS_INCLUDE, OPTS_INCDIR, OPTS_OPATH, "-T", "-L", "-u", "-Xlinker", OPTS_LINK_FILE, OPTS_LINK_LIB, OPTS_LINK_LIBDIR]
+options_exclude = ["-c"]
+
+c_source_file_ext = [".c" ]
+cpp_source_file_ext = [".cc", ".cpp"]
+asm_source_file_ext  = [".S", ".s"]
 
 def parse_compile_options(options, path, name) :
     files_obj = {
@@ -77,10 +106,11 @@ def parse_compile_options(options, path, name) :
                 files_obj["opath"] = options[i + 1]
             else:
                 files_obj["opath"] = options[i][len(OPTS_OPATH):]
+        elif options[i] in options_exclude:
+            pass
         else:
             if options[i] in options_with_arg:
-                files_obj["options"].append(options[i])
-                files_obj["options"].append(options[i + 1])
+                files_obj["options"].append(options[i] + " " + options[i + 1])
             else:
                 files_obj["options"].append(options[i])
 
@@ -91,7 +121,7 @@ def parse_compile_options(options, path, name) :
     return files_obj
 
 def parse_linker_options(options) :
-    linker_obj = {"opath" : "", "options":[]}
+    linker_obj = {"opath" : "", "options":[], "lib": [], "ld": [], "L":[]}
     i = 0
     while i < len(options):
         # process
@@ -102,15 +132,178 @@ def parse_linker_options(options) :
                     i += 1
                 else:
                     linker_obj["opath"] = options[i][len(OPTS_OPATH):]
+            elif options[i].startswith(OPTS_LINK_FILE) :
+                if len(options[i]) == len(OPTS_LINK_FILE):
+                    linker_obj["ld"].append(options[i + 1])
+                else:
+                    linker_obj["ld"].append(options[i][len(OPTS_LINK_FILE):])
+            elif options[i].startswith(OPTS_LINK_LIBDIR) :
+                if len(options[i]) == len(OPTS_LINK_LIBDIR):
+                    linker_obj["L"].append(options[i + 1])
+                else:
+                    linker_obj["L"].append(options[i][len(OPTS_LINK_LIBDIR):])
+            elif options[i].startswith(OPTS_LINK_LIB) :
+                if len(options[i]) == len(OPTS_LINK_LIB):
+                    linker_obj["lib"].append(options[i + 1])
+                else:
+                    linker_obj["lib"].append(options[i][len(OPTS_LINK_LIB):])
             else:
-                linker_obj["options"].append(options[i])
+                if options[i] in options_with_arg:
+                    linker_obj["options"].append(options[i] + " " + options[i + 1])
+                else:
+                    linker_obj["options"].append(options[i])
         i += 1
     return linker_obj
 
-with open(sys.argv[1], "r") as f:
-    for line in f:
-        items = line.split()
-        if items[-1].endswith(".map") :    
-            linker_obj = parse_linker_options(items[:-1])
+class DataObj(object):
+    def __init__(self):
+        self.comm = { "flags": set([]), "macros": set([]) }
+        self.c = { "flags": set([]), "macros": set([]) }
+        self.cpp = { "flags": set([]), "macros": set([]) }
+        self.asm = { "flags": set([]), "macros": set([]) }
+        self.linker = { "flags": set([]), "search_paths": set([]), "script_files": set([]) }
+        self.includes = {}
+        self.sources = {}
+
+    def feedFileOptions(self, obj):
+        file_ext = "." + obj["path"].split(".")[-1].lower()
+        if file_ext in c_source_file_ext:
+            self.c["flags"] = self.c["flags"] | set(obj["options"])
+            self.c["macros"] = self.c["macros"] | set(obj["macros"])
+        elif file_ext in cpp_source_file_ext:
+            self.cpp["flags"] = self.cpp["flags"] | set(obj["options"])
+            self.cpp["macros"] = self.cpp["macros"] | set(obj["macros"])
+        elif file_ext in asm_source_file_ext:
+            self.asm["flags"] = self.asm["flags"] | set(obj["options"])
+            self.asm["macros"] = self.asm["macros"] | set(obj["macros"])
+
+        self.comm["flags"] = self.comm["flags"] | set(obj["include"])
+
+        for include in obj["incdir"]:
+            if include.startswith(FE_SDK_PATH):
+                group_name = include[len(FE_SDK_PATH) + 1:]
+            elif include.startswith(APP_WORK_DIR):
+                group_name = include[len(APP_WORK_DIR) + 1:]                
+            else :
+                print("Error found relative include path in %s.", str(obj))
+                exit(2)
+            self.includes[group_name] = os.path.relpath(include, APP_WORK_DIR+ "/build")
+        
+        group_name = os.path.dirname(obj["path"])
+        if group_name.startswith(FE_SDK_PATH):
+            group_name = group_name[len(FE_SDK_PATH) + 1:]
+
+        elif group_name.startswith(APP_WORK_DIR):
+            group_name = group_name[len(APP_WORK_DIR) + 1:]
         else:
-            files_obj = parse_compile_options(items[1:-1], items[-1], items[0])
+            print("Error found relative sources path in %s.", str(obj))
+            exit(3)
+
+        self.sources.setdefault(group_name, []).append(os.path.relpath(obj["path"], APP_WORK_DIR + "/build"))
+
+    def feedLinkerOptions(self, obj):
+        self.linker["flags"] = set(obj["options"])
+        self.linker["search_paths"] = set(obj["L"])
+        self.linker["script_files"] = set(obj["ld"])
+        self.linker["libraries"] = set(obj["lib"])
+
+    def genDicts(self, name):
+        project_dicts = {"name": name}
+        project_dicts["common"] = {
+            "flags": None,
+            "macros": None,
+        }
+        project_dicts["c"] = {
+            "flags": None,
+            "macros": None,
+        }
+        project_dicts["cxx"] = {
+            "flags": None,
+            "macros": None,
+        }
+        project_dicts["asm"] = {
+            "flags": None,
+            "macros": None,
+        }
+        project_dicts["linker"] = {
+            'flags':None,
+            'script_files': None,
+            'search_paths': None,
+            'libraries': None
+        }
+        comm_macros = self.c["macros"] & self.cpp["macros"] & self.asm["macros"]
+        comm_flags = (self.c["flags"] & self.cpp["flags"] & self.asm["flags"] & self.linker["flags"]) | self.comm["flags"]
+
+        project_dicts["common"]["macros"] = list(comm_macros)
+        project_dicts["common"]["flags"] = list(comm_flags)
+        project_dicts["c"]["macros"] = list(self.c["macros"] - comm_macros)
+        project_dicts["c"]["flags"] = list(self.c["flags"] - comm_flags)
+        project_dicts["cxx"]["macros"] = list(self.cpp["macros"] - comm_macros)
+        project_dicts["cxx"]["flags"] = list(self.cpp["flags"] - comm_flags)
+        project_dicts["asm"]["macros"] = list(self.asm["macros"] - comm_macros)
+        project_dicts["asm"]["flags"] = list(self.asm["flags"] - comm_flags)
+
+        project_dicts["linker"]["flags"] = list(self.linker["flags"] - comm_flags)
+        project_dicts["linker"]["script_files"] = list(self.linker["script_files"])
+        project_dicts["linker"]["libraries"] = list(self.linker["libraries"])
+        project_dicts["linker"]["search_paths"] = list(self.linker["search_paths"])
+
+        project_dicts["subsrc"] = {}
+        project_dicts["files"] = {"includes": self.includes, "sources": self.sources}
+
+
+        return project_dicts
+
+class Generator:
+    def __init__(self, obj) :
+        self.settings = ProjectSettings()
+        self.settings.properties = []
+        self.basepath = "."
+        self.projects_dict = {
+            "toolchains":{"gcc":"", "gcc_prefix":CROSS_COMPILE}
+        }
+        self.pobj = obj
+    
+    def generate(self, name='', tool='gnu_mcu_eclipse'):
+        self.project = Project(name, tool, None, self.settings, self, None, self.pobj.genDicts(name))
+        return self.project.generate()
+
+    def push_properties(self):
+        pass
+
+    def pop_properties(self):
+        pass
+
+    def merge_properties_without_override(self, prop_dict):
+        pass
+
+
+if __name__ == '__main__':
+    # Parse Options
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-t", "--tool", help="Create project files for provided tool", default='gnu_mcu_eclipse',
+        type=argparse_string_type(str.lower, False), choices=list(ToolsSupported.TOOLS_DICT.keys()) + list(ToolsSupported.TOOLS_ALIAS.keys()))
+    parser.add_argument(
+        "-p", "--project", help="Project to be generated", default = 'App')
+    parser.add_argument('file')
+    args = parser.parse_args()
+
+    data_obj = DataObj()
+    with open(args.file, "r") as f:        
+        for line in f:
+            items = line.split()
+            if items[-1].endswith(".map") :    
+                data_obj.feedLinkerOptions(parse_linker_options(items[:-1]))
+            else:
+                data_obj.feedFileOptions(parse_compile_options(items[1:-1], items[-1], items[0]))
+
+    generate = Generator(data_obj)
+    generate.generate(args.project, args.tool)
+
+    #print(yaml_obj.comm)
+    #print(yaml_obj.asm)
+    #print(yaml_obj.c)
+    #print(yaml_obj.cpp)
+    #print(yaml_obj.includes)
+    #print(yaml_obj.sources)

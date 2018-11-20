@@ -341,8 +341,9 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
 
     def _expand_one_file(self, source, new_data, extension):
         # use reference count to instead '..'
-        source = normpath(source).replace('../', '').replace('..\\', '')
-        return {"path": join('PARENT-%s-PROJECT_LOC' % new_data['output_dir']['rel_count'], source).replace('\\', '/'),
+        source = normpath(source).replace('\\', '/')
+        # new_data['output_dir']['rel_count']
+        return {"path": join('PARENT-%d-PROJECT_LOC' % source.count("../"), source).replace('../', ''),
                 "name": basename(source), 
                 "type": self.file_types[extension.lower()]}
 
@@ -475,6 +476,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
     
     def _fix_cmd_path(self, misc):
         _misc = copy.copy(misc)
+        if not _misc: return _misc
         for cmd in ["pre_cmd", "post_cmd"]:
             if cmd in misc:
                 _misc[cmd] = []
