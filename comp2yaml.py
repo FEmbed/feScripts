@@ -19,6 +19,8 @@ import sys
 import os
 import os.path
 import argparse
+import re
+
 from collections import OrderedDict
 
 from progen.tools_supported import ToolsSupported
@@ -95,10 +97,8 @@ def parse_compile_options(options, path, name) :
         elif options[i].startswith(OPTS_INCLUDE) :
             if len(options[i]) == len(OPTS_INCLUDE):
                 files_obj["include"].append(options[i + 1])
-                files_obj["options"].append(options[i] + " " + options[i + 1])
             else:
                 files_obj["include"].append(options[i][len(OPTS_INCLUDE):])
-                files_obj["options"].append(options[i])                
         elif options[i].startswith(OPTS_INCDIR) :
             if len(options[i]) == len(OPTS_INCDIR):
                 files_obj["incdir"].append(options[i + 1])
@@ -170,7 +170,8 @@ class DataObj(object):
         self.cpp = { "flags": set([]), "macros": set([]) }
         self.asm = { "flags": set([]), "macros": set([]) }
         self.linker = { "flags": set([]), "search_paths": set([]), "script_files": set([]) }
-        self.includes = OrderedDict()
+        self.incdirs = OrderedDict()
+        self.includes = []
         self.sources = {}
 
     def feedFileOptions(self, obj):
@@ -186,6 +187,9 @@ class DataObj(object):
             self.asm["macros"] = self.asm["macros"] | set(obj["macros"])
 
         self.comm["flags"] = self.comm["flags"]
+        for include in obj["include"]:
+            if include not in self.includes:
+                self.includes.append(include)
 
         for include in obj["incdir"]:
             if include.startswith(FE_SDK_PATH):
@@ -195,7 +199,7 @@ class DataObj(object):
             else :
                 print("Error found relative include path in %s.", str(obj))
                 exit(2)
-            self.includes[group_name] = os.path.relpath(include, APP_WORK_DIR+ "/dummy")
+            self.incdirs[group_name] = os.path.relpath(include, APP_WORK_DIR+ "/dummy")
 
         group_name = os.path.dirname(obj["path"])
         if group_name.startswith(FE_SDK_PATH):
@@ -242,7 +246,17 @@ class DataObj(object):
         comm_macros = self.c["macros"] & self.cpp["macros"] & self.asm["macros"]
         comm_flags = (self.c["flags"] & self.cpp["flags"] & self.asm["flags"] & self.linker["flags"]) | self.comm["flags"]
 
-        project_dicts["common"]["macros"] = list(comm_macros)
+        file_macros = []
+        for inc in self.incdirs.keys():
+            for f in self.includes:
+                # check file if "build/include" + f exists?
+                if os.path.exists(inc + "/" + f) :
+                    with open(inc + "/" + f) as f:
+                        ctx = f.read()
+                        for macro in re.findall("#define\s+(\w+)\s+(.*?)\n", ctx):
+                            file_macros.append("%s=%s" % macro)
+
+        project_dicts["common"]["macros"] = list(comm_macros | set(file_macros))
         project_dicts["common"]["flags"] = list(comm_flags)
         project_dicts["c"]["macros"] = list(self.c["macros"] - comm_macros)
         project_dicts["c"]["flags"] = list(self.c["flags"] - comm_flags)
@@ -257,7 +271,8 @@ class DataObj(object):
         project_dicts["linker"]["search_paths"] = list(self.linker["search_paths"])
 
         project_dicts["subsrc"] = {}
-        project_dicts["files"] = {"includes": self.includes, "sources": self.sources}
+        project_dicts["files"] = {"includes": self.incdirs, "sources": self.sources}
+
         return project_dicts
 
 class Generator:
