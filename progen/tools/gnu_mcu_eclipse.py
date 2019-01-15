@@ -413,6 +413,8 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
             for flag in expanded_dic['flags'][name] :
                 if flag.startswith("-O") :
                     expanded_dic["options"]["optimization"] = EclipseGnuMCU.get_optimization_gnuarmeclipse_id(flag)
+                elif flag.startswith("-ggdb") :
+                    pass
                 elif flag.startswith("-g") :
                     expanded_dic["options"]["debug"] = EclipseGnuMCU.get_debug_gnuarmeclipse_id(flag)
                 elif flag.startswith("-mcpu=") :
