@@ -614,7 +614,7 @@ class Project:
     def _ignore_source_files(self, s_cfg_path, d_cfg_path, src, names):
         ignore_names = []
         for name in names:
-            if os.path.splitext(name)[1] in [".h", ".hpp", "inc"]:
+            if name.split('.')[-1] in FILES_EXTENSIONS["include_files"]:
                 d_cfg_file = os.path.normpath(os.path.join(d_cfg_path, os.path.relpath(s_cfg_path, src), name))
                 self.project['files']['includes'].setdefault(self._get_portable_group(), []).append(os.path.relpath(d_cfg_file, self.basepath))
             else:
@@ -624,7 +624,7 @@ class Project:
     def _ignore_header_files(self, s_port_path, d_port_path, src, names):
         ignore_names = []
         for name in names:
-            if os.path.splitext(name)[1] in [".c", ".cpp", "cc"]:
+            if name.split('.')[-1] in FILES_EXTENSIONS["source_files_s"] + FILES_EXTENSIONS["source_files_c"] + FILES_EXTENSIONS["source_files_cpp"]:
                 d_port_file = os.path.normpath(os.path.join(d_port_path, os.path.relpath(s_port_path, src), name))
                 self.project['files']['sources'].setdefault(self._get_portable_group(), []).append(os.path.relpath(d_port_file, self.basepath))
             else:

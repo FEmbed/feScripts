@@ -35,7 +35,7 @@ def _fix_special_symbol(line):
     
 class EclipseGnuMCU(Tool, Exporter, Builder):
 
-    file_types = {'cpp': 1, 'c': 1, 's': 1, 'obj': 1, 'lib': 1, 'h': 1}
+    file_types = {'cc': 1, 'cxx': 1, 'cpp': 1, 'c': 1, 's': 1, 'obj': 1, 'lib': 1, 'h': 1, 'hh' : 1}
 
     generated_project = {
         'path': '',
@@ -365,6 +365,30 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         else:
             return item.replace('\\', '/')
 
+    def update_cross_options(self, expanded_dic, c_flags, cxx_flags, asm_flags, ld_flags):
+        expanded_dic["options"] = {}
+        print expanded_dic['flags']
+        for name in ["common", "ld", "c", "cxx", "asm"] :
+            for flag in expanded_dic['flags'][name] :
+                if flag.startswith("-O") :
+                    expanded_dic["options"]["optimization"] = EclipseGnuMCU.get_optimization_gnuarmeclipse_id(flag)
+                elif flag.startswith("-ggdb") :
+                    pass
+                elif flag.startswith("-g") :
+                    expanded_dic["options"]["debug"] = EclipseGnuMCU.get_debug_gnuarmeclipse_id(flag)
+                elif name == "common" :
+                    c_flags.append(flag)
+                    cxx_flags.append(flag)
+                    asm_flags.append(flag)
+                elif name == "c" :
+                    c_flags.append(flag)
+                elif name == "cxx" :
+                    cxx_flags.append(flag)
+                elif name == "asm" :
+                    asm_flags.append(flag)
+                else:
+                    ld_flags.append(flag)
+
     def update_arm_options(self, expanded_dic, c_flags, cxx_flags, asm_flags, ld_flags):
         expanded_dic["options"] = {}
         expanded_dic["options"]["optimization"] = EclipseGnuMCU.get_optimization_gnuarmeclipse_id("")
@@ -508,7 +532,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         for key,values in macros.items():
             _macros[key] = []
             for macro in values:
-                _macros[key].append(_fix_special_symbol(macro))
+                _macros[key].append("'" + _fix_special_symbol(macro) + "'")
         return _macros
 
     def get_generated_project_files(self):

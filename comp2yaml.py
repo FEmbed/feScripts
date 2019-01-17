@@ -73,7 +73,7 @@ options_with_arg = [OPTS_MACRO, OPTS_INCLUDE, OPTS_INCDIR, OPTS_OPATH, "-u", "-X
 options_exclude = ["-c", "-Wl,--start-group", "-Wl,--end-group"]
 
 c_source_file_ext = [".c" ]
-cpp_source_file_ext = [".cc", ".cpp"]
+cpp_source_file_ext = [".cc", ".cpp", ".cxx"]
 asm_source_file_ext  = [".S", ".s"]
 
 def parse_compile_options(options, path, name) :
@@ -197,8 +197,8 @@ class DataObj(object):
             elif include.startswith(APP_WORK_DIR):
                 group_name = include[len(APP_WORK_DIR) + 1:]                
             else :
-                print("Error found relative include path(%s) in %s."%(include, [FE_SDK_PATH, APP_WORK_DIR]))
-                exit(2)
+                print("Warn can't found relative include path(%s) in %s."%(include, [FE_SDK_PATH, APP_WORK_DIR]))
+                continue
             self.incdirs[group_name] = os.path.relpath(include, APP_WORK_DIR+ "/dummy")
 
         group_name = os.path.dirname(obj["path"])
@@ -318,6 +318,5 @@ if __name__ == '__main__':
                 data_obj.feedLinkerOptions(parse_linker_options(items[:-1]))
             else:
                 data_obj.feedFileOptions(parse_compile_options(items[1:-1], items[-1], items[0]))
-
     generate = Generator(data_obj)
     generate.generate(args.project, args.tool)

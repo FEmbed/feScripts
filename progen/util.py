@@ -24,10 +24,10 @@ from collections import OrderedDict
 from functools import reduce
 
 FILES_EXTENSIONS = {
-    'include_files': ['h', 'hpp', 'inc'],
+    'include_files': ['h', 'hpp', 'inc', 'hh'],
     'source_files_s': ['s'],
     'source_files_c': ['c'],
-    'source_files_cpp': ['cpp', 'cc'],
+    'source_files_cpp': ['cpp', 'cc', 'cxx'],
     'source_files_lib': ['lib', 'ar', 'a'],
     'source_files_obj': ['o', 'obj'],
     'linker_file': ['sct', 'ld', 'lin', 'icf'],
