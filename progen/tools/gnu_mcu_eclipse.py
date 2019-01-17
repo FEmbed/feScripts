@@ -260,7 +260,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         self.workspace = workspace
         self.env_settings = env_settings
             # all bool gnu mcu eclipse options store here
-        self.GNU_MCU_BOOL_COMMAND2OPTIONS = {
+        self.GNU_MCU_ARM_BOOL_COMMAND2OPTIONS = {
         "-Wall":"false",
         "-Wextra":"false",
         "-fsyntax-only":"false",
@@ -327,7 +327,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         "-v":"false",
         }
     
-        self.GNU_MCU_STR_COMMAND2OPTIONS = {
+        self.GNU_MCU_ARM_STR_COMMAND2OPTIONS = {
         
         }
     
@@ -364,7 +364,55 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
             return nitem
         else:
             return item.replace('\\', '/')
-    
+
+    def update_arm_options(self, expanded_dic, c_flags, cxx_flags, asm_flags, ld_flags):
+        expanded_dic["options"] = {}
+        expanded_dic["options"]["optimization"] = EclipseGnuMCU.get_optimization_gnuarmeclipse_id("")
+        expanded_dic["options"]["debug"] = EclipseGnuMCU.get_debug_gnuarmeclipse_id("")
+        expanded_dic["options"]["mcu"] = EclipseGnuMCU.get_mcpu_gnuarmeclipse_id("")
+        expanded_dic["options"]["instructionset"] = EclipseGnuMCU.get_instructionset_gnuarmeclipse_id("")
+        expanded_dic["options"]["fpuabi"] = EclipseGnuMCU.get_fpuabi_gnuarmeclipse_id("")
+        expanded_dic["options"]["fpu"] = EclipseGnuMCU.get_mfpu_gnuarmeclipse_id("")
+        expanded_dic["options"]["unalignedaccess"] = EclipseGnuMCU.get_unalignedaccess_gnuarmeclipse_id("")
+        
+        for name in ["common", "ld", "c", "cxx", "asm"] :
+            for flag in expanded_dic['flags'][name] :
+                if flag.startswith("-O") :
+                    expanded_dic["options"]["optimization"] = EclipseGnuMCU.get_optimization_gnuarmeclipse_id(flag)
+                elif flag.startswith("-ggdb") :
+                    pass
+                elif flag.startswith("-g") :
+                    expanded_dic["options"]["debug"] = EclipseGnuMCU.get_debug_gnuarmeclipse_id(flag)
+                elif flag.startswith("-mcpu=") :
+                    expanded_dic["options"]["mcu"] = EclipseGnuMCU.get_mcpu_gnuarmeclipse_id(flag)
+                elif flag in ["-mthumb", "-marm"] :
+                    expanded_dic["options"]["instructionset"] = EclipseGnuMCU.get_instructionset_gnuarmeclipse_id(flag)
+                elif flag.startswith("-mfloat-abi=") :
+                    expanded_dic["options"]["fpuabi"] = EclipseGnuMCU.get_fpuabi_gnuarmeclipse_id(flag)
+                elif flag.startswith("-mfpu=") :
+                    expanded_dic["options"]["fpu"] = EclipseGnuMCU.get_mfpu_gnuarmeclipse_id(flag)
+                elif flag in ["-munaligned-access","-mno-unaligned-access"]:
+                    expanded_dic["options"]["unalignedaccess"] = EclipseGnuMCU.get_unalignedaccess_gnuarmeclipse_id(flag)
+                elif flag.replace(" ","") in self.GNU_MCU_ARM_BOOL_COMMAND2OPTIONS:
+                    self.GNU_MCU_ARM_BOOL_COMMAND2OPTIONS[flag.replace(" ","")] = "true"
+                elif flag.replace(" ","") in self.GNU_MCU_ARM_STR_COMMAND2OPTIONS:
+                    self.GNU_MCU_ARM_BOOL_COMMAND2OPTIONS[flag.replace(" ","")] = flag
+                elif name == "common" :
+                    c_flags.append(flag)
+                    cxx_flags.append(flag)
+                    asm_flags.append(flag)
+                elif name == "c" :
+                    c_flags.append(flag)
+                elif name == "cxx" :
+                    cxx_flags.append(flag)
+                elif name == "asm" :
+                    asm_flags.append(flag)
+                else:
+                    ld_flags.append(flag)
+
+        expanded_dic["options"]["value"] = self.GNU_MCU_ARM_BOOL_COMMAND2OPTIONS
+        expanded_dic["options"]["value"].update(self.GNU_MCU_ARM_STR_COMMAND2OPTIONS)
+
     def export_workspace(self):
         logger.debug("Current version of CoIDE does not support workspaces")
 
@@ -375,7 +423,7 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         expanded_dic = self.workspace.copy()
         expanded_dic["toolchains"] = copy.copy(self.workspace["toolchains"])
         expanded_dic["misc"] = self._fix_cmd_path(copy.copy(self.workspace["misc"]))
-        expanded_dic["macros"] = self._fix_macro_quot(expanded_dic["macros"])
+        expanded_dic["macros"] = self._fix_macro_quot(expanded_dic["macros"])        
         
         # process path format in windows
         for name in ['include_paths', 'source_paths','include_paths', 'linker_search_paths', 'lib_search_paths',
@@ -396,56 +444,18 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
             if rgrp not in expanded_dic['src_groups']:
                 expanded_dic['src_groups'].append(rgrp)
 
-        expanded_dic["options"] = {}
-        expanded_dic["options"]["optimization"] = EclipseGnuMCU.get_optimization_gnuarmeclipse_id("")
-        expanded_dic["options"]["debug"] = EclipseGnuMCU.get_debug_gnuarmeclipse_id("")
-        expanded_dic["options"]["mcu"] = EclipseGnuMCU.get_mcpu_gnuarmeclipse_id("")
-        expanded_dic["options"]["instructionset"] = EclipseGnuMCU.get_instructionset_gnuarmeclipse_id("")
-        expanded_dic["options"]["fpuabi"] = EclipseGnuMCU.get_fpuabi_gnuarmeclipse_id("")
-        expanded_dic["options"]["fpu"] = EclipseGnuMCU.get_mfpu_gnuarmeclipse_id("")
-        expanded_dic["options"]["unalignedaccess"] = EclipseGnuMCU.get_unalignedaccess_gnuarmeclipse_id("")
-        
         c_flags = []
         cxx_flags = []
         asm_flags = []
         ld_flags = []
-        for name in ["common", "ld", "c", "cxx", "asm"] :
-            for flag in expanded_dic['flags'][name] :
-                if flag.startswith("-O") :
-                    expanded_dic["options"]["optimization"] = EclipseGnuMCU.get_optimization_gnuarmeclipse_id(flag)
-                elif flag.startswith("-ggdb") :
-                    pass
-                elif flag.startswith("-g") :
-                    expanded_dic["options"]["debug"] = EclipseGnuMCU.get_debug_gnuarmeclipse_id(flag)
-                elif flag.startswith("-mcpu=") :
-                    expanded_dic["options"]["mcu"] = EclipseGnuMCU.get_mcpu_gnuarmeclipse_id(flag)
-                elif flag in ["-mthumb", "-marm"] :
-                    expanded_dic["options"]["instructionset"] = EclipseGnuMCU.get_instructionset_gnuarmeclipse_id(flag)
-                elif flag.startswith("-mfloat-abi=") :
-                    expanded_dic["options"]["fpuabi"] = EclipseGnuMCU.get_fpuabi_gnuarmeclipse_id(flag)
-                elif flag.startswith("-mfpu=") :
-                    expanded_dic["options"]["fpu"] = EclipseGnuMCU.get_mfpu_gnuarmeclipse_id(flag)
-                elif flag in ["-munaligned-access","-mno-unaligned-access"]:
-                    expanded_dic["options"]["unalignedaccess"] = EclipseGnuMCU.get_unalignedaccess_gnuarmeclipse_id(flag)
-                elif flag.replace(" ","") in self.GNU_MCU_BOOL_COMMAND2OPTIONS:
-                    self.GNU_MCU_BOOL_COMMAND2OPTIONS[flag.replace(" ","")] = "true"
-                elif flag.replace(" ","") in self.GNU_MCU_STR_COMMAND2OPTIONS:
-                    self.GNU_MCU_BOOL_COMMAND2OPTIONS[flag.replace(" ","")] = flag
-                elif name == "common" :
-                    c_flags.append(flag)
-                    cxx_flags.append(flag)
-                    asm_flags.append(flag)
-                elif name == "c" :
-                    c_flags.append(flag)
-                elif name == "cxx" :
-                    cxx_flags.append(flag)
-                elif name == "asm" :
-                    asm_flags.append(flag)
-                else:
-                    ld_flags.append(flag)
 
-        expanded_dic["options"]["value"] = self.GNU_MCU_BOOL_COMMAND2OPTIONS
-        expanded_dic["options"]["value"].update(self.GNU_MCU_STR_COMMAND2OPTIONS)
+        if expanded_dic["toolchains"]["gcc_prefix"].startswith("arm"):
+            self.update_arm_options(expanded_dic, c_flags, cxx_flags, asm_flags, ld_flags)
+        elif expanded_dic["toolchains"]["gcc_prefix"].startswith("riscv"):
+            self.update_riscv_options(expanded_dic, c_flags, cxx_flags, asm_flags, ld_flags)
+        else:
+            self.update_cross_options(expanded_dic, c_flags, cxx_flags, asm_flags, ld_flags)
+
         expanded_dic["options"]["other_ld_flags"] = " ".join(ld_flags)
         expanded_dic["options"]["other_c_flags"]  = " ".join(c_flags)
         expanded_dic["options"]["other_cxx_flags"] = " ".join(cxx_flags)
@@ -455,13 +465,20 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         expanded_dic["include_paths"] = self._fix_gnu_mcu_path(expanded_dic["include_paths"])
         expanded_dic["linker_search_paths"] = self._fix_gnu_mcu_path(expanded_dic["linker_search_paths"])
         
-        if expanded_dic["type"] == "exe":            
+        if expanded_dic["toolchains"]["gcc_prefix"].startswith("arm"):
+            if expanded_dic["type"] == "exe":            
+                project_path, output['files']['cproj'] = self.gen_file_jinja(
+                    'gnu_mcu_eclipse.arm.elf.cproject.tmpl', expanded_dic, '.cproject', expanded_dic['output_dir']['path'])
+            else:        
+                project_path, output['files']['cproj'] = self.gen_file_jinja(
+                    'gnu_mcu_eclipse.arm.lib.cproject.tmpl', expanded_dic, '.cproject', expanded_dic['output_dir']['path'])
+        elif expanded_dic["toolchains"]["gcc_prefix"].startswith("riscv"):
             project_path, output['files']['cproj'] = self.gen_file_jinja(
-                'gnu_mcu_eclipse.elf.cproject.tmpl', expanded_dic, '.cproject', expanded_dic['output_dir']['path'])
-        else:        
+                    'gnu_mcu_eclipse.riscv.elf.cproject.tmpl', expanded_dic, '.cproject', expanded_dic['output_dir']['path'])
+        else:
             project_path, output['files']['cproj'] = self.gen_file_jinja(
-                'gnu_mcu_eclipse.lib.cproject.tmpl', expanded_dic, '.cproject', expanded_dic['output_dir']['path'])
-        
+                    'gnu_mcu_eclipse.cross.elf.cproject.tmpl', expanded_dic, '.cproject', expanded_dic['output_dir']['path'])
+
         project_path, output['files']['proj_file'] = self.gen_file_jinja(
             'eclipse.project.tmpl', expanded_dic, '.project', expanded_dic['output_dir']['path'])
         return output
