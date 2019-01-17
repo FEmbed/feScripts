@@ -197,7 +197,7 @@ class DataObj(object):
             elif include.startswith(APP_WORK_DIR):
                 group_name = include[len(APP_WORK_DIR) + 1:]                
             else :
-                print("Error found relative include path in %s.", str(obj))
+                print("Error found relative include path(%s) in %s."%(include, [FE_SDK_PATH, APP_WORK_DIR]))
                 exit(2)
             self.incdirs[group_name] = os.path.relpath(include, APP_WORK_DIR+ "/dummy")
 
