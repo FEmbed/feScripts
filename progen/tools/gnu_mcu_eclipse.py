@@ -532,7 +532,8 @@ class EclipseGnuMCU(Tool, Exporter, Builder):
         for key,values in macros.items():
             _macros[key] = []
             for macro in values:
-                _macros[key].append("'" + _fix_special_symbol(macro) + "'")
+                #_macros[key].append("'" + _fix_special_symbol(macro) + "'")
+                _macros[key].append(_fix_special_symbol(macro))
         return _macros
 
     def get_generated_project_files(self):
